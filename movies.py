@@ -244,6 +244,7 @@ def _create_movie_html(title: str, movie: dict) -> str:
     safe_title = escape(title)
     safe_title_attribute = escape(title, quote=True)
     safe_year = escape(str(movie["year"]))
+    safe_rating = escape(f"{movie['rating']:.1f}")
     poster_url = escape(movie.get("poster", ""), quote=True)
     note = movie.get("notes", "")
     safe_note = escape(note)
@@ -279,6 +280,9 @@ def _create_movie_html(title: str, movie: dict) -> str:
         f"                    {poster_html}\n"
         f'                    <div class="movie-title">{safe_title}</div>\n'
         f'                    <div class="movie-year">{safe_year}</div>\n'
+        f'                    <div class="movie-rating" '
+        f'aria-label="Rating: {safe_rating} out of 10">'
+        f"&#9733; {safe_rating}</div>\n"
         "                </div>\n"
         "            </li>"
     )
