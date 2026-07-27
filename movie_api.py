@@ -6,7 +6,6 @@ import re
 import requests
 from dotenv import load_dotenv
 
-
 OMDB_URL = "https://www.omdbapi.com/"
 REQUEST_TIMEOUT = 10
 
@@ -42,9 +41,7 @@ def get_movie(title: str) -> dict:
     load_dotenv()
     api_key = os.getenv("OMDB_API")
     if not api_key:
-        raise MovieAPIError(
-            "OMDB_API is missing. Add it to the project's .env file."
-        )
+        raise MovieAPIError("OMDB_API is missing. Add it to the project's .env file.")
 
     try:
         response = requests.get(

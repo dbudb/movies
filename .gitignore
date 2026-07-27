@@ -4,4 +4,5 @@ __pycache__/
 *.py[cod]
 .idea/
 data/*.db
-_static/index.html
+_static/*.html
+!_static/index_template.html

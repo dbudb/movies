@@ -1,4 +1,5 @@
 import random
+import re
 from html import escape
 from pathlib import Path
 
@@ -8,7 +9,6 @@ from Levenshtein import distance
 import movie_api
 from storage import movie_storage_sql as storage
 
-
 STATIC_DIRECTORY = Path(__file__).parent / "_static"
 TEMPLATE_FILE = STATIC_DIRECTORY / "index_template.html"
 WEBSITE_FILE = STATIC_DIRECTORY / "index.html"
@@ -16,17 +16,17 @@ WEBSITE_TITLE = "My Movie App"
 
 
 def get_menu_choice() -> int:
-    """Prompt for and return a valid menu choice from 0 through 10."""
+    """Prompt for and return a valid menu choice from 0 through 11."""
     while True:
-        user_input = input("Enter Choice (0-10): ")
+        user_input = input("Enter Choice (0-11): ")
         try:
             user_input = int(user_input)
-            if 0 <= user_input <= 10:
+            if 0 <= user_input <= 11:
                 return user_input
             else:
-                print("Valid numbers are 0 - 10 (including)!")
+                print("Valid numbers are 0 - 11 (including)!")
         except ValueError:
-            print("Number must be a digit (between 0 and 10).")
+            print("Number must be a digit (between 0 and 11).")
 
 
 def get_movie_title(prompt: str) -> str:
@@ -39,6 +39,47 @@ def get_movie_title(prompt: str) -> str:
             return movie_title
         else:
             print("Title can not be empty.")
+
+
+def get_user_name(prompt: str) -> str:
+    """Prompt for and return a non-empty profile name."""
+    while True:
+        user_name = input(prompt).strip()
+        if user_name:
+            return user_name
+        print("User name can not be empty.")
+
+
+def select_user() -> dict | None:
+    """Let the user select an existing profile or create a new one."""
+    while True:
+        users = storage.list_users()
+        print("\nSelect a user:")
+        for index, user in enumerate(users, start=1):
+            print(f"{index}. {user['name']}")
+
+        create_choice = len(users) + 1
+        print(f"{create_choice}. Create new user")
+        print("0. Exit")
+
+        try:
+            choice = int(input("Enter choice: "))
+        except ValueError:
+            print("Please enter one of the displayed numbers.")
+            continue
+
+        if choice == 0:
+            return None
+        if choice == create_choice:
+            name = get_user_name("Enter new user name: ")
+            user_id = storage.add_user(name)
+            if user_id is not None:
+                return {"id": user_id, "name": name}
+            continue
+        if 1 <= choice <= len(users):
+            return users[choice - 1]
+
+        print("Please enter one of the displayed numbers.")
 
 
 def get_file_name(prompt: str) -> str:
@@ -87,7 +128,7 @@ def movie_exists(movies: dict[str, dict], movie_title: str) -> bool:
     return movie_title in movies
 
 
-def command_add_movie(movies: dict[str, dict]) -> None:
+def command_add_movie(movies: dict[str, dict], user_id: int) -> None:
     """Retrieve a movie from OMDb and add it to the database."""
     requested_title = get_movie_title("Enter new movie name: ")
 
@@ -106,6 +147,7 @@ def command_add_movie(movies: dict[str, dict]) -> None:
         return
 
     storage.add_movie(
+        user_id,
         movie_title,
         movie["year"],
         movie["rating"],
@@ -242,111 +284,141 @@ def _create_movie_html(title: str, movie: dict) -> str:
     )
 
 
-def generate_website(movies: dict[str, dict]) -> None:
-    """Generate the movie website from the HTML template."""
+def generate_website(
+    movies: dict[str, dict],
+    output_file: Path = WEBSITE_FILE,
+    website_title: str = WEBSITE_TITLE,
+) -> None:
+    """Generate a movie website from the HTML template."""
     template = TEMPLATE_FILE.read_text(encoding="utf-8")
     movie_grid = "\n".join(
-        _create_movie_html(title, movie)
-        for title, movie in movies.items()
+        _create_movie_html(title, movie) for title, movie in movies.items()
     )
-    website = template.replace("__TEMPLATE_TITLE__", WEBSITE_TITLE)
+    website = template.replace("__TEMPLATE_TITLE__", website_title)
     website = website.replace("__TEMPLATE_MOVIE_GRID__", movie_grid)
-    WEBSITE_FILE.write_text(website, encoding="utf-8")
+    output_file.write_text(website, encoding="utf-8")
+
+
+def get_profile_website_file(user: dict) -> Path:
+    """Return a safe profile-specific website path."""
+    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", user["name"]).strip("_")
+    if not safe_name:
+        safe_name = f"user_{user['id']}"
+    return STATIC_DIRECTORY / f"{safe_name}.html"
 
 
 def main():
-    """This function inhabits the handling of valid user inputs, the menu loop and connects our other functions. The
-    movies are loaded from SQLite through the storage package on every loop
-    iteration.
-    """
+    """Run the profile selection and movie command loops."""
+    print("Welcome to the Movie App!")
 
-    running = True
-    print("********** My Movies Database **********")
-    while running:
-        movies = storage.list_movies()
-        print("Menu:")
-        print("0. Exit")
-        print("1. List movie")
-        print("2. Add movie")
-        print("3. Delete movie")
-        print("4. Update movie")
-        print("5. Stats")
-        print("6. Random movie")
-        print("7. Search movie")
-        print("8. Movies sorted by rating")
-        print("9. Generate website")
-        print("10. Print rating histogram")
-        print("\n")
-
-        user_input = get_menu_choice()
-
-        if user_input == 0:
+    while True:
+        active_user = select_user()
+        if active_user is None:
             print("Bye!")
-            running = False
-            break
+            return
 
-        elif user_input == 1:
-            print(list_movies(movies))
+        print(f"\nWelcome back, {active_user['name']}!")
 
-        elif user_input == 2:
-            command_add_movie(movies)
+        while True:
+            movies = storage.list_movies(active_user["id"])
+            print("\nMenu:")
+            print("0. Exit")
+            print("1. List movies")
+            print("2. Add movie")
+            print("3. Delete movie")
+            print("4. Update movie")
+            print("5. Stats")
+            print("6. Random movie")
+            print("7. Search movie")
+            print("8. Movies sorted by rating")
+            print("9. Generate website")
+            print("10. Print rating histogram")
+            print("11. Switch user")
 
-        elif user_input == 3:
-            user_title = get_movie_title("Enter movie name to delete: ")
-            if movie_exists(movies, user_title):
-                storage.delete_movie(user_title)
-            else:
-                print(f"Movie {user_title} not found.")
+            user_input = get_menu_choice()
 
-        elif user_input == 4:
-            user_title = get_movie_title("Enter movie name: ")
+            if user_input == 0:
+                print("Bye!")
+                return
 
-            if movie_exists(movies, user_title):
+            if user_input == 1:
+                if movies:
+                    print(list_movies(movies))
+                else:
+                    print(
+                        f"{active_user['name']}, your movie collection "
+                        "is empty. Add some movies!"
+                    )
+
+            elif user_input == 2:
+                command_add_movie(movies, active_user["id"])
+
+            elif user_input == 3:
+                user_title = get_movie_title("Enter movie name to delete: ")
+                if movie_exists(movies, user_title):
+                    storage.delete_movie(active_user["id"], user_title)
+                else:
+                    print(f"Movie {user_title} not found.")
+
+            elif user_input == 4:
+                user_title = get_movie_title("Enter movie name: ")
+                if not movie_exists(movies, user_title):
+                    print(f"{user_title} not in database.")
+                    continue
+
                 print(f"{user_title}: {movies[user_title]['rating']}")
-            else:
-                print(f"{user_title} not in database.")
-                continue
-
-            user_rating = get_movie_rating("Enter new movie rating (0-10): ")
-
-            storage.update_movie(user_title, user_rating)
-
-        elif user_input == 5:
-            movie_stats = stats(movies)
-            print(movie_stats)
-
-        elif user_input == 6:
-            print(random_movie(movies))
-
-        elif user_input == 7:
-            user_title = input("Enter part of movie name: ")
-            print(search_movie(movies, user_title))
-
-        elif user_input == 8:
-            sorted_movies = sort_movie_by_rating(movies)
-            print(sorted_movies)
-
-        elif user_input == 9:
-            generate_website(movies)
-            print("Website was generated successfully.")
-
-        elif user_input == 10:
-            if not movies:
-                print("Database is empty. No histogram to create.")
-            else:
-                plt.hist([movie["rating"] for movie in movies.values()])
-                file_name = get_file_name(
-                    "In which file do you want to save your histogram? "
+                user_rating = get_movie_rating("Enter new movie rating (0-10): ")
+                storage.update_movie(
+                    active_user["id"],
+                    user_title,
+                    user_rating,
                 )
-                try:
-                    plt.savefig(file_name)
-                    print(f"Successfully saved as {file_name}.")
-                except Exception as error:
-                    print(f"Could not save the histogram: {error}")
-                finally:
-                    plt.clf()
 
-        input("\nPress enter to continue")
+            elif user_input == 5:
+                print(stats(movies))
+
+            elif user_input == 6:
+                print(random_movie(movies))
+
+            elif user_input == 7:
+                user_title = input("Enter part of movie name: ")
+                print(search_movie(movies, user_title))
+
+            elif user_input == 8:
+                print(sort_movie_by_rating(movies))
+
+            elif user_input == 9:
+                website_file = get_profile_website_file(active_user)
+                website_title = f"{active_user['name']}'s Movie Collection"
+                generate_website(
+                    movies,
+                    output_file=website_file,
+                    website_title=website_title,
+                )
+                print("Website was generated successfully.")
+                print(f"Saved as {website_file.name}.")
+
+            elif user_input == 10:
+                if not movies:
+                    print("Database is empty. No histogram to create.")
+                else:
+                    plt.hist([movie["rating"] for movie in movies.values()])
+                    file_name = get_file_name(
+                        "In which file do you want to save your " "histogram? "
+                    )
+                    try:
+                        plt.savefig(file_name)
+                        print(f"Successfully saved as {file_name}.")
+                    except Exception as error:
+                        print(f"Could not save the histogram: {error}")
+                    finally:
+                        plt.clf()
+
+            elif user_input == 11:
+                print("Switching user...")
+                break
+
+            input("\nPress enter to continue")
 
 
 if __name__ == "__main__":
