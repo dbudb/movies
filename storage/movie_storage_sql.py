@@ -36,6 +36,7 @@ def _create_movies_table(connection, table_name="movies"):
                 year INTEGER NOT NULL,
                 rating REAL NOT NULL,
                 poster TEXT NOT NULL,
+                notes TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (user_id) REFERENCES users(id)
                     ON DELETE CASCADE,
                 UNIQUE (user_id, title)
@@ -49,6 +50,10 @@ def _migrate_movies_table(connection):
     column_names = {column[1] for column in columns}
 
     if "user_id" in column_names:
+        if "notes" not in column_names:
+            connection.execute(
+                text("ALTER TABLE movies " "ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+            )
         return
 
     movie_count = connection.execute(text("SELECT COUNT(*) FROM movies")).scalar_one()
@@ -66,13 +71,15 @@ def _migrate_movies_table(connection):
 
     if movie_count:
         poster_expression = "poster" if "poster" in column_names else "''"
+        notes_expression = "notes" if "notes" in column_names else "''"
         connection.execute(
             text(f"""
                 INSERT INTO movies_new (
-                    id, user_id, title, year, rating, poster
+                    id, user_id, title, year, rating, poster, notes
                 )
                 SELECT
-                    id, :user_id, title, year, rating, {poster_expression}
+                    id, :user_id, title, year, rating,
+                    {poster_expression}, {notes_expression}
                 FROM movies
                 """),
             {"user_id": legacy_user_id},
@@ -144,7 +151,7 @@ def list_movies(user_id):
     with engine.connect() as connection:
         rows = connection.execute(
             text("""
-                SELECT title, year, rating, poster
+                SELECT title, year, rating, poster, notes
                 FROM movies
                 WHERE user_id = :user_id
                 ORDER BY title COLLATE NOCASE
@@ -157,22 +164,23 @@ def list_movies(user_id):
             "year": row[1],
             "rating": row[2],
             "poster": row[3],
+            "notes": row[4],
         }
         for row in rows
     }
 
 
-def add_movie(user_id, title, year, rating, poster):
+def add_movie(user_id, title, year, rating, poster, notes=""):
     """Add a movie to one user's collection."""
     with engine.connect() as connection:
         try:
             connection.execute(
                 text("""
                     INSERT INTO movies (
-                        user_id, title, year, rating, poster
+                        user_id, title, year, rating, poster, notes
                     )
                     VALUES (
-                        :user_id, :title, :year, :rating, :poster
+                        :user_id, :title, :year, :rating, :poster, :notes
                     )
                     """),
                 {
@@ -181,6 +189,7 @@ def add_movie(user_id, title, year, rating, poster):
                     "year": year,
                     "rating": rating,
                     "poster": poster,
+                    "notes": notes,
                 },
             )
             connection.commit()
@@ -214,20 +223,20 @@ def delete_movie(user_id, title):
     return False
 
 
-def update_movie(user_id, title, rating):
-    """Update a movie rating in one user's collection."""
+def update_movie(user_id, title, notes):
+    """Update a movie note in one user's collection."""
     with engine.connect() as connection:
         result = connection.execute(
             text("""
                 UPDATE movies
-                SET rating = :rating
+                SET notes = :notes
                 WHERE user_id = :user_id AND title = :title
                 """),
-            {"user_id": user_id, "title": title, "rating": rating},
+            {"user_id": user_id, "title": title, "notes": notes},
         )
         connection.commit()
 
     if result.rowcount:
-        print(f"Movie '{title}' updated successfully.")
+        print(f"Movie {title} successfully updated.")
         return True
     return False

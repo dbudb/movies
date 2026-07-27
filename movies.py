@@ -94,22 +94,6 @@ def get_file_name(prompt: str) -> str:
             print("Filename can not be empty or contain / or \\ .")
 
 
-def get_movie_rating(prompt: str) -> float:
-    """Prompts the user (with prompt given as argument) to input a movie rating.
-    Validates the input and returns the validated rating.
-    """
-    while True:
-        movie_rating = input(prompt)
-        try:
-            movie_rating = float(movie_rating)
-            if 0.0 <= movie_rating <= 10.0:
-                return movie_rating
-            else:
-                print("Rating must be between 0 and 10.")
-        except ValueError:
-            print("Please enter your rating in format '3.5'.")
-
-
 def list_movies(movies: dict[str, dict]) -> str:
     """Expects a dictionary for example {'Pulp Fiction': {'rating': 9.9, 'year': 1994}, ...} and returns a formated
     string like:
@@ -258,20 +242,36 @@ def sort_movie_by_rating(movies: dict[str, dict]) -> str:
 def _create_movie_html(title: str, movie: dict) -> str:
     """Create the HTML markup for one movie card."""
     safe_title = escape(title)
+    safe_title_attribute = escape(title, quote=True)
     safe_year = escape(str(movie["year"]))
     poster_url = escape(movie.get("poster", ""), quote=True)
+    note = movie.get("notes", "")
+    safe_note = escape(note)
+    safe_note_attribute = escape(note, quote=True)
 
     if poster_url:
-        poster_html = (
+        poster = (
             f'<img class="movie-poster" src="{poster_url}" '
-            f'alt="{safe_title} poster">'
+            f'alt="{safe_title_attribute} poster">'
         )
     else:
-        poster_html = (
+        poster = (
             '<div class="movie-poster movie-poster-missing">'
             "No poster available"
             "</div>"
         )
+
+    if safe_note:
+        poster_html = (
+            '<div class="movie-poster-container" tabindex="0" '
+            f'aria-label="Movie note: {safe_note_attribute}">\n'
+            f"                        {poster}\n"
+            '                        <div class="movie-note" '
+            f'role="tooltip">{safe_note}</div>\n'
+            "                    </div>"
+        )
+    else:
+        poster_html = poster
 
     return (
         "            <li>\n"
@@ -366,12 +366,11 @@ def main():
                     print(f"{user_title} not in database.")
                     continue
 
-                print(f"{user_title}: {movies[user_title]['rating']}")
-                user_rating = get_movie_rating("Enter new movie rating (0-10): ")
+                movie_note = input("Enter movie note: ").strip()
                 storage.update_movie(
                     active_user["id"],
                     user_title,
-                    user_rating,
+                    movie_note,
                 )
 
             elif user_input == 5:

@@ -10,6 +10,7 @@ statistics and search tools, and generates a poster-based HTML website.
 - Maintain separate movie collections for multiple user profiles
 - Store titles, release years, IMDb ratings, and poster URLs in SQLite
 - List, search, update, delete, sort, and randomly select movies
+- Add personal notes that appear when a website poster is hovered or focused
 - Show rating statistics and generate a rating histogram
 - Generate a profile-specific static movie website
 

@@ -37,7 +37,8 @@ def check_legacy_migration():
 
         users = storage.list_users()
         assert users == [{"id": 1, "name": "Default"}]
-        assert "Legacy Movie" in storage.list_movies(users[0]["id"])
+        legacy_movie = storage.list_movies(users[0]["id"])["Legacy Movie"]
+        assert legacy_movie["notes"] == ""
 
         print("Legacy migration preservation check: OK")
         storage.engine.dispose()
@@ -68,9 +69,11 @@ def main():
             "https://example.com/inception.jpg",
         )
 
-        storage.update_movie(sara_id, "Inception", 9.0)
-        assert storage.list_movies(sara_id)["Inception"]["rating"] == 9.0
-        assert storage.list_movies(john_id)["Inception"]["rating"] == 8.8
+        storage.update_movie(sara_id, "Inception", "My favorite movie!")
+        assert (
+            storage.list_movies(sara_id)["Inception"]["notes"] == "My favorite movie!"
+        )
+        assert storage.list_movies(john_id)["Inception"]["notes"] == ""
 
         storage.delete_movie(sara_id, "Inception")
         assert storage.list_movies(sara_id) == {}
