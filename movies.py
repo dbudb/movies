@@ -107,59 +107,88 @@ def list_movies(movies: dict[str, dict]) -> str:
     return output
 
 
-def movie_exists(movies: dict[str, dict], movie_title: str) -> bool:
-    """Returns if an exact title exists in a dictionary as key and returns a bool."""
-    return movie_title in movies
-
-
-def resolve_movie_title(
+def find_movie_matches(
     movies: dict[str, dict],
     search_title: str,
-) -> str | None:
-    """Return the canonical stored title matching a user's search."""
+    *,
+    allow_partial: bool = True,
+    max_distance: int = 2,
+) -> list[str]:
+    """Return stored titles matching a query, ordered by match quality."""
     normalized_search = search_title.strip().casefold()
     if not normalized_search:
-        return None
+        return []
 
-    for stored_title in movies:
-        if stored_title.casefold() == normalized_search:
-            return stored_title
-
-    partial_matches = [
+    exact_matches = [
         stored_title
         for stored_title in movies
-        if normalized_search in stored_title.casefold()
+        if stored_title.casefold() == normalized_search
     ]
-    if len(partial_matches) == 1:
-        return partial_matches[0]
-    if len(partial_matches) > 1:
-        return None
+    if exact_matches:
+        return exact_matches
 
-    distances = [
+    if allow_partial:
+        partial_matches = [
+            stored_title
+            for stored_title in movies
+            if normalized_search in stored_title.casefold()
+        ]
+        if partial_matches:
+            return partial_matches
+
+    if max_distance <= 0:
+        return []
+
+    scored_titles = [
         (
             distance(normalized_search, stored_title.casefold()),
             stored_title,
         )
         for stored_title in movies
     ]
-    if not distances:
-        return None
+    if not scored_titles:
+        return []
 
-    best_distance = min(item[0] for item in distances)
-    best_matches = [
+    best_distance = min(item[0] for item in scored_titles)
+    if best_distance > max_distance:
+        return []
+
+    return [
         stored_title
-        for title_distance, stored_title in distances
+        for title_distance, stored_title in scored_titles
         if title_distance == best_distance
     ]
-    if best_distance <= 2 and len(best_matches) == 1:
-        return best_matches[0]
 
-    return None
+
+def resolve_movie_title(
+    movies: dict[str, dict],
+    search_title: str,
+) -> str | None:
+    """Return one unambiguous canonical title for a user's search."""
+    matches = find_movie_matches(movies, search_title)
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
+def find_exact_movie(movies: dict[str, dict], search_title: str) -> str | None:
+    """Return a case-insensitive exact title match."""
+    matches = find_movie_matches(
+        movies,
+        search_title,
+        allow_partial=False,
+        max_distance=0,
+    )
+    return matches[0] if matches else None
 
 
 def command_add_movie(movies: dict[str, dict], user_id: int) -> None:
     """Retrieve a movie from OMDb and add it to the database."""
     requested_title = get_movie_title("Enter new movie name: ")
+    existing_title = find_exact_movie(movies, requested_title)
+    if existing_title:
+        print(f"Movie '{existing_title}' already exists!")
+        return
 
     try:
         movie = movie_api.get_movie(requested_title)
@@ -171,8 +200,9 @@ def command_add_movie(movies: dict[str, dict], user_id: int) -> None:
         return
 
     movie_title = movie["title"]
-    if movie_exists(movies, movie_title):
-        print(f"Movie '{movie_title}' already exists!")
+    existing_title = find_exact_movie(movies, movie_title)
+    if existing_title:
+        print(f"Movie '{existing_title}' already exists!")
         return
 
     storage.add_movie(
@@ -243,30 +273,12 @@ def random_movie(movies: dict[str, dict]) -> str:
 
 
 def search_movie(movies: dict[str, dict], movie_title: str) -> str:
-    """Expects a dictionary for example {'Pulp Fiction': 9.9, ...} and a movie title and returns a string, either listing
-    all movie titles matching the search keyword or stating 'no matching movies'. Therefore first checks if exact movie
-    title is in our dict, then, if not, looking if our search string is a substring of the title of one of our movies and
-    last calling the distance function from the Levenshtein library to calculate the Levenshtein distance between the
-    search string and all movie titles. If there are titles with 2 or less as the levenshtein distance, it is considered
-    as matching and returned in a formatted string.
-    """
-    search_output = ""
-    movie_title_lower = movie_title.lower()
+    """Return formatted exact, partial, or fuzzy movie matches."""
+    matches = find_movie_matches(movies, movie_title)
+    if not matches:
+        return "No matching movies found."
 
-    if movie_exists(movies, movie_title):
-        search_output += f"{movie_title}, {movies[movie_title]['rating']}\n"
-
-    else:
-        for movie, info in movies.items():
-            if movie_title_lower in movie.lower():
-                search_output += f"{movie}, {info['rating']}\n"
-
-        if not search_output:
-            for movie, info in movies.items():
-                if distance(movie_title_lower, movie.lower()) <= 2:
-                    search_output += f"{movie}, {info['rating']}\n"
-
-    return search_output if search_output else "No matching movies found."
+    return "".join(f"{title}, {movies[title]['rating']}\n" for title in matches)
 
 
 def sort_movie_by_rating(movies: dict[str, dict]) -> str:
