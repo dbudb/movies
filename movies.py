@@ -1,4 +1,7 @@
 import random
+from html import escape
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 from Levenshtein import distance
 
@@ -6,18 +9,24 @@ import movie_api
 import movie_storage_sql as storage
 
 
+STATIC_DIRECTORY = Path(__file__).parent / "_static"
+TEMPLATE_FILE = STATIC_DIRECTORY / "index_template.html"
+WEBSITE_FILE = STATIC_DIRECTORY / "index.html"
+WEBSITE_TITLE = "My Movie App"
+
+
 def get_menu_choice() -> int:
-    """Prompts the user for a menu choice from 0 to 9 (including), validates the input and returns the validated input."""
+    """Prompt for and return a valid menu choice from 0 through 10."""
     while True:
-        user_input = input("Enter Choice (0-9): ")
+        user_input = input("Enter Choice (0-10): ")
         try:
             user_input = int(user_input)
-            if 0 <= user_input <= 9:
+            if 0 <= user_input <= 10:
                 return user_input
             else:
-                print("Valid numbers are 0 - 9 (including)!")
+                print("Valid numbers are 0 - 10 (including)!")
         except ValueError:
-            print("Number must be a digit (between 0 and 9).")
+            print("Number must be a digit (between 0 and 10).")
 
 
 def get_movie_title(prompt: str) -> str:
@@ -204,6 +213,47 @@ def sort_movie_by_rating(movies: dict[str, dict]) -> str:
     return formatted_output
 
 
+def _create_movie_html(title: str, movie: dict) -> str:
+    """Create the HTML markup for one movie card."""
+    safe_title = escape(title)
+    safe_year = escape(str(movie["year"]))
+    poster_url = escape(movie.get("poster", ""), quote=True)
+
+    if poster_url:
+        poster_html = (
+            f'<img class="movie-poster" src="{poster_url}" '
+            f'alt="{safe_title} poster">'
+        )
+    else:
+        poster_html = (
+            '<div class="movie-poster movie-poster-missing">'
+            "No poster available"
+            "</div>"
+        )
+
+    return (
+        "            <li>\n"
+        '                <div class="movie">\n'
+        f"                    {poster_html}\n"
+        f'                    <div class="movie-title">{safe_title}</div>\n'
+        f'                    <div class="movie-year">{safe_year}</div>\n'
+        "                </div>\n"
+        "            </li>"
+    )
+
+
+def generate_website(movies: dict[str, dict]) -> None:
+    """Generate the movie website from the HTML template."""
+    template = TEMPLATE_FILE.read_text(encoding="utf-8")
+    movie_grid = "\n".join(
+        _create_movie_html(title, movie)
+        for title, movie in movies.items()
+    )
+    website = template.replace("__TEMPLATE_TITLE__", WEBSITE_TITLE)
+    website = website.replace("__TEMPLATE_MOVIE_GRID__", movie_grid)
+    WEBSITE_FILE.write_text(website, encoding="utf-8")
+
+
 def main():
     """This function inhabits the handling of valid user inputs, the menu loop and connects our other functions. The
     movies are loaded from SQLite via the movie_storage_sql module on every loop
@@ -224,7 +274,8 @@ def main():
         print("6. Random movie")
         print("7. Search movie")
         print("8. Movies sorted by rating")
-        print("9. Print rating histogram")
+        print("9. Generate website")
+        print("10. Print rating histogram")
         print("\n")
 
         user_input = get_menu_choice()
@@ -276,6 +327,10 @@ def main():
             print(sorted_movies)
 
         elif user_input == 9:
+            generate_website(movies)
+            print("Website was generated successfully.")
+
+        elif user_input == 10:
             if not movies:
                 print("Database is empty. No histogram to create.")
             else:
