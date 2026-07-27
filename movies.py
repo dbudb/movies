@@ -312,7 +312,7 @@ def _create_movie_html(title: str, movie: dict) -> str:
     if poster_url:
         poster = (
             f'<img class="movie-poster" src="{poster_url}" '
-            f'alt="{safe_title_attribute} poster">'
+            f'alt="{safe_title_attribute} poster" loading="lazy">'
         )
     else:
         poster = (
