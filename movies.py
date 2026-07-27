@@ -112,6 +112,51 @@ def movie_exists(movies: dict[str, dict], movie_title: str) -> bool:
     return movie_title in movies
 
 
+def resolve_movie_title(
+    movies: dict[str, dict],
+    search_title: str,
+) -> str | None:
+    """Return the canonical stored title matching a user's search."""
+    normalized_search = search_title.strip().casefold()
+    if not normalized_search:
+        return None
+
+    for stored_title in movies:
+        if stored_title.casefold() == normalized_search:
+            return stored_title
+
+    partial_matches = [
+        stored_title
+        for stored_title in movies
+        if normalized_search in stored_title.casefold()
+    ]
+    if len(partial_matches) == 1:
+        return partial_matches[0]
+    if len(partial_matches) > 1:
+        return None
+
+    distances = [
+        (
+            distance(normalized_search, stored_title.casefold()),
+            stored_title,
+        )
+        for stored_title in movies
+    ]
+    if not distances:
+        return None
+
+    best_distance = min(item[0] for item in distances)
+    best_matches = [
+        stored_title
+        for title_distance, stored_title in distances
+        if title_distance == best_distance
+    ]
+    if best_distance <= 2 and len(best_matches) == 1:
+        return best_matches[0]
+
+    return None
+
+
 def command_add_movie(movies: dict[str, dict], user_id: int) -> None:
     """Retrieve a movie from OMDb and add it to the database."""
     requested_title = get_movie_title("Enter new movie name: ")
@@ -358,22 +403,28 @@ def main():
                 command_add_movie(movies, active_user["id"])
 
             elif user_input == 3:
-                user_title = get_movie_title("Enter movie name to delete: ")
-                if movie_exists(movies, user_title):
-                    storage.delete_movie(active_user["id"], user_title)
+                search_title = get_movie_title("Enter movie name to delete: ")
+                movie_title = resolve_movie_title(movies, search_title)
+                if movie_title:
+                    if movie_title.casefold() != search_title.casefold():
+                        print(f"Using closest match: {movie_title}")
+                    storage.delete_movie(active_user["id"], movie_title)
                 else:
-                    print(f"Movie {user_title} not found.")
+                    print(f"Movie {search_title} not found.")
 
             elif user_input == 4:
-                user_title = get_movie_title("Enter movie name: ")
-                if not movie_exists(movies, user_title):
-                    print(f"{user_title} not in database.")
+                search_title = get_movie_title("Enter movie name: ")
+                movie_title = resolve_movie_title(movies, search_title)
+                if not movie_title:
+                    print(f"{search_title} not in database.")
                     continue
 
+                if movie_title.casefold() != search_title.casefold():
+                    print(f"Using closest match: {movie_title}")
                 movie_note = input("Enter movie note: ").strip()
                 storage.update_movie(
                     active_user["id"],
-                    user_title,
+                    movie_title,
                     movie_note,
                 )
 
