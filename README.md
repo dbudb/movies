@@ -12,6 +12,7 @@ statistics and search tools, and generates a poster-based HTML website.
 - List, search, update, delete, sort, and randomly select movies
 - Add personal notes that appear when a website poster is hovered or focused
 - Display each movie's IMDb rating on its generated website card
+- Open a movie's exact IMDb page by clicking its poster
 - Show rating statistics and generate a rating histogram
 - Generate a profile-specific static movie website
 

@@ -58,6 +58,17 @@ body {
     height: 193px;
 }
 
+.movie-poster-link {
+  display: block;
+  width: 128px;
+  height: 193px;
+}
+
+.movie-poster-link:focus-visible {
+  outline: 3px solid #009B50;
+  outline-offset: 3px;
+}
+
 .movie-poster-container {
   position: relative;
   width: 128px;
@@ -88,7 +99,8 @@ body {
 }
 
 .movie-poster-container:hover .movie-note,
-.movie-poster-container:focus .movie-note {
+.movie-poster-container:focus .movie-note,
+.movie-poster-container:focus-within .movie-note {
   opacity: 1;
   visibility: visible;
 }

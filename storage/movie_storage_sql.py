@@ -37,6 +37,7 @@ def _create_movies_table(connection, table_name="movies"):
                 rating REAL NOT NULL,
                 poster TEXT NOT NULL,
                 notes TEXT NOT NULL DEFAULT '',
+                imdb_id TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (user_id) REFERENCES users(id)
                     ON DELETE CASCADE,
                 UNIQUE (user_id, title)
@@ -53,6 +54,12 @@ def _migrate_movies_table(connection):
         if "notes" not in column_names:
             connection.execute(
                 text("ALTER TABLE movies " "ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+            )
+        if "imdb_id" not in column_names:
+            connection.execute(
+                text(
+                    "ALTER TABLE movies " "ADD COLUMN imdb_id TEXT NOT NULL DEFAULT ''"
+                )
             )
         return
 
@@ -72,14 +79,16 @@ def _migrate_movies_table(connection):
     if movie_count:
         poster_expression = "poster" if "poster" in column_names else "''"
         notes_expression = "notes" if "notes" in column_names else "''"
+        imdb_id_expression = "imdb_id" if "imdb_id" in column_names else "''"
         connection.execute(
             text(f"""
                 INSERT INTO movies_new (
-                    id, user_id, title, year, rating, poster, notes
+                    id, user_id, title, year, rating, poster, notes, imdb_id
                 )
                 SELECT
                     id, :user_id, title, year, rating,
-                    {poster_expression}, {notes_expression}
+                    {poster_expression}, {notes_expression},
+                    {imdb_id_expression}
                 FROM movies
                 """),
             {"user_id": legacy_user_id},
@@ -151,7 +160,7 @@ def list_movies(user_id):
     with engine.connect() as connection:
         rows = connection.execute(
             text("""
-                SELECT title, year, rating, poster, notes
+                SELECT title, year, rating, poster, notes, imdb_id
                 FROM movies
                 WHERE user_id = :user_id
                 ORDER BY title COLLATE NOCASE
@@ -165,22 +174,24 @@ def list_movies(user_id):
             "rating": row[2],
             "poster": row[3],
             "notes": row[4],
+            "imdb_id": row[5],
         }
         for row in rows
     }
 
 
-def add_movie(user_id, title, year, rating, poster, notes=""):
+def add_movie(user_id, title, year, rating, poster, notes="", imdb_id=""):
     """Add a movie to one user's collection."""
     with engine.connect() as connection:
         try:
             connection.execute(
                 text("""
                     INSERT INTO movies (
-                        user_id, title, year, rating, poster, notes
+                        user_id, title, year, rating, poster, notes, imdb_id
                     )
                     VALUES (
-                        :user_id, :title, :year, :rating, :poster, :notes
+                        :user_id, :title, :year, :rating, :poster, :notes,
+                        :imdb_id
                     )
                     """),
                 {
@@ -190,6 +201,7 @@ def add_movie(user_id, title, year, rating, poster, notes=""):
                     "rating": rating,
                     "poster": poster,
                     "notes": notes,
+                    "imdb_id": imdb_id,
                 },
             )
             connection.commit()

@@ -211,6 +211,7 @@ def command_add_movie(movies: dict[str, dict], user_id: int) -> None:
         movie["year"],
         movie["rating"],
         movie["poster"],
+        imdb_id=movie["imdb_id"],
     )
 
 
@@ -306,6 +307,7 @@ def _create_movie_html(title: str, movie: dict) -> str:
     note = movie.get("notes", "")
     safe_note = escape(note)
     safe_note_attribute = escape(note, quote=True)
+    imdb_id = movie.get("imdb_id", "")
 
     if poster_url:
         poster = (
@@ -317,6 +319,16 @@ def _create_movie_html(title: str, movie: dict) -> str:
             '<div class="movie-poster movie-poster-missing">'
             "No poster available"
             "</div>"
+        )
+
+    if re.fullmatch(r"tt\d+", imdb_id):
+        poster = (
+            f'<a class="movie-poster-link" '
+            f'href="https://www.imdb.com/title/{imdb_id}/" '
+            f'target="_blank" rel="noopener noreferrer" '
+            f'aria-label="Open {safe_title_attribute} on IMDb">\n'
+            f"                            {poster}\n"
+            "                        </a>"
         )
 
     if safe_note:

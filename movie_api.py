@@ -37,7 +37,7 @@ def _parse_rating(rating_value: str) -> float:
 
 
 def get_movie(title: str) -> dict:
-    """Retrieve a movie's title, year, rating, and poster URL from OMDb."""
+    """Retrieve a movie's title, year, rating, poster, and IMDb ID."""
     load_dotenv()
     api_key = os.getenv("OMDB_API")
     if not api_key:
@@ -73,4 +73,5 @@ def get_movie(title: str) -> dict:
         "year": _parse_year(data.get("Year", "")),
         "rating": _parse_rating(data.get("imdbRating", "")),
         "poster": poster,
+        "imdb_id": data.get("imdbID", ""),
     }
