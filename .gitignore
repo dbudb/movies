@@ -3,3 +3,5 @@
 __pycache__/
 *.py[cod]
 .idea/
+data/*.db
+_static/index.html

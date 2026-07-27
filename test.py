@@ -1,4 +1,4 @@
-from movie_storage_sql import (
+from storage.movie_storage_sql import (
     add_movie,
     delete_movie,
     list_movies,

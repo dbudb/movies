@@ -1,9 +1,16 @@
 """SQLAlchemy-backed storage operations for the movie application."""
 
+from pathlib import Path
+
 from sqlalchemy import create_engine, text
 
 
-DB_URL = "sqlite:///movies.db"
+PROJECT_DIRECTORY = Path(__file__).resolve().parent.parent
+DATA_DIRECTORY = PROJECT_DIRECTORY / "data"
+DATA_DIRECTORY.mkdir(exist_ok=True)
+
+DB_FILE = DATA_DIRECTORY / "movies.db"
+DB_URL = f"sqlite:///{DB_FILE.as_posix()}"
 
 engine = create_engine(DB_URL, echo=True)
 

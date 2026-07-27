@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from Levenshtein import distance
 
 import movie_api
-import movie_storage_sql as storage
+from storage import movie_storage_sql as storage
 
 
 STATIC_DIRECTORY = Path(__file__).parent / "_static"
@@ -256,7 +256,7 @@ def generate_website(movies: dict[str, dict]) -> None:
 
 def main():
     """This function inhabits the handling of valid user inputs, the menu loop and connects our other functions. The
-    movies are loaded from SQLite via the movie_storage_sql module on every loop
+    movies are loaded from SQLite through the storage package on every loop
     iteration.
     """
 
